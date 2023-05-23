@@ -1,10 +1,10 @@
 #!/bin/bash
 
-resourceGroupName="df3"
+resourceGroupName="df4"
 
-az bicep build \
-  --file azuredeploy.bicep \
-  --outfile azuredeploy.json
+az bicep build --file azuredeploy.bicep --stdout \
+  | jq '(.resources[] | select(.type == "Microsoft.Resources/deploymentScripts")).dependsOn += ["triggers"]' \
+  > azuredeploy.json
 
 git commit -am . && git push
 

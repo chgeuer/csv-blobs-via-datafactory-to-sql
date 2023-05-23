@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.17.1.54307",
-      "templateHash": "2610602744997483017"
+      "templateHash": "15752889500805087563"
     }
   },
   "parameters": {
@@ -641,7 +641,8 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
-        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]"
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]",
+        "triggers"
       ]
     }
   ],
@@ -650,7 +651,8 @@
       "type": "object",
       "value": {
         "containers": "[map(variables('integrations'), lambda('i', format('{0}/{1}', reference(resourceId('Microsoft.Storage/storageAccounts', variables('names').resources.blobStorageAccount), '2022-09-01').primaryEndpoints.blob, lambdaVariables('i').container)))]",
-        "DATAFACTORY_ID": "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]"
+        "DATAFACTORY_ID": "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "storageAccount": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('names').resources.blobStorageAccount), '2022-09-01').primaryEndpoints.blob]"
       }
     }
   }

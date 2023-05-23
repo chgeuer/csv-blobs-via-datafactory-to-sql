@@ -434,4 +434,5 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
 output results object = {
   containers: map(integrations, i => '${storageAccount.properties.primaryEndpoints.blob}/${i.container}')
   DATAFACTORY_ID:  dataFactory.id
+  storageAccount: storageAccount.properties.primaryEndpoints.blob
 }

@@ -1,18 +1,5 @@
 #!/bin/bash
 
-# https://learn.microsoft.com/en-us/rest/api/datafactory/triggers/start?tabs=HTTP
-
-# curl \
-#    --silent \
-#    --url https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 \
-#    --location \
-#    --output ./jq
-#
-# chmod +x ./jq
-# sudo mv ./jq /usr/local/bin
-# sudo chown root.root /usr/local/bin/jq
-
-
 echo "TRIGGERJOINCHAR: ${TRIGGERJOINCHAR}"
 echo "TRIGGERS: ${TRIGGERS}"
 echo "DATAFACTORY_ID: ${DATAFACTORY_ID}"
@@ -25,6 +12,7 @@ access_token="$(curl --silent --get --header "Metadata: true" \
     --url "http://169.254.169.254/metadata/identity/oauth2/token" \
     | jq -r ".access_token")"
 
+# string.split("|", "a|b|c")
 IFS="${TRIGGERJOINCHAR}" read -a triggerNames <<< "${TRIGGERS}"
 
 for triggerName in "${triggerNames[@]}"

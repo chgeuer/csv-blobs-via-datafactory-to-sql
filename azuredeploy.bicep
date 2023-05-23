@@ -63,6 +63,7 @@ var names = {
     expextedSuffix: '.csv'
   }
   roles: {
+    DataFactoryContributor: '673868aa-7521-48a0-acc6-0f60742d39f5'
     KeyVault: {
       CryptoOfficer: '14b46e9e-c2b7-41b4-b07b-48a6ebf60603'
       SecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
@@ -193,6 +194,17 @@ resource dataFactory 'Microsoft.DataFactory/factories@2018-06-01' = {
     userAssignedIdentities: { 
       '${uami.id}': {}
     }
+  }
+}
+
+resource uamiIsDataFactoryContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  // The UAMI must be able to call the trigger start function.
+  name: guid(uami.id, names.roles.DataFactoryContributor, dataFactory.id)
+  scope: dataFactory
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', names.roles.DataFactoryContributor)
+    principalId: uami.properties.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 

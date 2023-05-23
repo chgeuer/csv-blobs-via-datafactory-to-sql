@@ -28,6 +28,7 @@ var uniqueHostPrefix = 'k${uniqueString(resourceGroup().id)}'
 param currentDateMarker string = utcNow('yyyy-MM-dd--HH-mm-ss')
 
 var names = {
+  triggerJoinChar: '|'
   resources: {
     // keyVault: empty(deploymentName) ? keyVaultName : uniqueHostPrefix // This would allow to remove the `useDerivedNames` parameter
     keyVault: empty(keyVaultName) ? uniqueHostPrefix : uniqueHostPrefix
@@ -412,7 +413,8 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
     primaryScriptUri: uri(_artifactsLocation, names.deploymentScript.scriptName)
     environmentVariables: [
       { name: 'DATAFACTORY_ID', value: dataFactory.id }
-      { name: 'TRIGGERS', value: join(map(integrations, i => i.suffix), '|') }
+      { name: 'TRIGGERS', value: join(map(integrations, i => i.suffix), names.triggerJoinChar) }
+      { name: 'TRIGGERJOINCHAR', value: names.triggerJoinChar }
     ]
   }
 }

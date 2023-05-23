@@ -1,0 +1,637 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.17.1.54307",
+      "templateHash": "17674016876792495713"
+    }
+  },
+  "parameters": {
+    "blobStorageAccountName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Blob storage for incoming CSV files"
+      }
+    },
+    "sqlservername": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "SQL server name"
+      }
+    },
+    "sqlAdminName": {
+      "type": "string",
+      "defaultValue": "sqladmin",
+      "metadata": {
+        "description": "SQL Server - Admin user name"
+      }
+    },
+    "sqlAdminPassword": {
+      "type": "securestring",
+      "defaultValue": "SuperSecret123456.-",
+      "metadata": {
+        "description": "SQL Server - Admin password"
+      }
+    },
+    "keyVaultName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Here are all password safed for the database and the blob storage"
+      }
+    },
+    "datafactoryname": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Data factory name"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "The location of the deployment"
+      }
+    },
+    "_artifactsLocation": {
+      "type": "string",
+      "defaultValue": "[deployment().properties.templateLink.uri]",
+      "metadata": {
+        "description": "Location for scripts etc."
+      }
+    },
+    "currentDateMarker": {
+      "type": "string",
+      "defaultValue": "[utcNow('yyyy-MM-dd--HH-mm-ss')]"
+    }
+  },
+  "variables": {
+    "uniqueHostPrefix": "[format('k{0}', uniqueString(resourceGroup().id))]",
+    "names": {
+      "resources": {
+        "keyVault": "[if(empty(parameters('keyVaultName')), variables('uniqueHostPrefix'), variables('uniqueHostPrefix'))]",
+        "blobStorageAccount": "[if(empty(parameters('blobStorageAccountName')), variables('uniqueHostPrefix'), parameters('blobStorageAccountName'))]",
+        "dataFactory": "[if(empty(parameters('datafactoryname')), variables('uniqueHostPrefix'), parameters('datafactoryname'))]",
+        "sql": {
+          "serverName": "[if(empty(parameters('sqlservername')), variables('uniqueHostPrefix'), parameters('sqlservername'))]",
+          "databasename": "database",
+          "administratorName": "[parameters('sqlAdminName')]",
+          "administratorPassword": "[parameters('sqlAdminPassword')]"
+        },
+        "uami": "[format('{0}-runtime', variables('uniqueHostPrefix'))]"
+      },
+      "secrets": {
+        "blobStorageConnectionString": "blobStorageConnectionString",
+        "dataBaseConnectionString": "databaseConnectionString"
+      },
+      "deploymentScript": {
+        "name": "[format('deploymentScriptTriggers--{0}', parameters('currentDateMarker'))]",
+        "azCliVersion": "2.36.0",
+        "scriptName": "scripts/start-triggers.sh"
+      },
+      "dataFactory": {
+        "linkedServices": {
+          "keyVault": "linkedService_KeyVault",
+          "blobStorage": "linkedService_BlobStorage",
+          "sqlDatabase": "linkedService_Database"
+        }
+      },
+      "csvSettings": {
+        "expectedPrefix": "import",
+        "expextedSuffix": ".csv"
+      },
+      "roles": {
+        "KeyVault": {
+          "CryptoOfficer": "14b46e9e-c2b7-41b4-b07b-48a6ebf60603",
+          "SecretsUser": "4633458b-17de-408a-b874-0445c86b69e6"
+        },
+        "StorageBlob": {
+          "DataReader": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+        }
+      }
+    },
+    "integrations": [
+      {
+        "suffix": "SomeSuffic",
+        "container": "inputcontainer1",
+        "schema": {
+          "csv": [
+            {
+              "name": "DATE",
+              "type": "String"
+            },
+            {
+              "name": "NAME",
+              "type": "String"
+            },
+            {
+              "name": "STREET",
+              "type": "String"
+            }
+          ],
+          "db": [
+            {
+              "name": "TupleID",
+              "type": "int",
+              "precision": 10
+            },
+            {
+              "name": "DATE",
+              "type": "String"
+            },
+            {
+              "name": "NAME",
+              "type": "String"
+            },
+            {
+              "name": "STREET",
+              "type": "String"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[variables('names').resources.uami]",
+      "location": "[parameters('location')]",
+      "metadata": {
+        "description": "A user-assigned managed identity for the runtime."
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('names').resources.blobStorageAccount]",
+      "location": "[parameters('location')]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "accessTier": "Cool",
+        "allowSharedKeyAccess": true,
+        "allowBlobPublicAccess": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2022-09-01",
+      "name": "[format('{0}/{1}', variables('names').resources.blobStorageAccount, 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('names').resources.blobStorageAccount)]"
+      ]
+    },
+    {
+      "type": "Microsoft.Sql/servers",
+      "apiVersion": "2021-11-01",
+      "name": "[variables('names').resources.sql.serverName]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "administratorLogin": "[variables('names').resources.sql.administratorName]",
+        "administratorLoginPassword": "[variables('names').resources.sql.administratorPassword]"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "apiVersion": "2021-11-01",
+      "name": "[format('{0}/{1}', variables('names').resources.sql.serverName, variables('names').resources.sql.databasename)]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "collation": "Latin1_General_CI_AS"
+      },
+      "sku": {
+        "name": "Standard",
+        "size": "Standard",
+        "tier": "Standard"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', variables('names').resources.sql.serverName)]"
+      ]
+    },
+    {
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2021-11-01",
+      "name": "[format('{0}/{1}', variables('names').resources.sql.serverName, 'firewallrules')]",
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', variables('names').resources.sql.serverName)]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2022-07-01",
+      "name": "[variables('names').resources.keyVault]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "tenantId": "[subscription().tenantId]",
+        "enableRbacAuthorization": true
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.KeyVault/vaults/{0}', variables('names').resources.keyVault)]",
+      "name": "[guid(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami), variables('names').roles.KeyVault.SecretsUser, resourceId('Microsoft.KeyVault/vaults', variables('names').resources.keyVault))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('names').roles.KeyVault.SecretsUser)]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('names').resources.keyVault)]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2022-07-01",
+      "name": "[format('{0}/{1}', variables('names').resources.keyVault, variables('names').secrets.blobStorageConnectionString)]",
+      "properties": {
+        "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}', variables('names').resources.blobStorageAccount, listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('names').resources.blobStorageAccount), '2022-09-01').keys[0].value)]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('names').resources.keyVault)]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('names').resources.blobStorageAccount)]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2022-07-01",
+      "name": "[format('{0}/{1}', variables('names').resources.keyVault, variables('names').secrets.dataBaseConnectionString)]",
+      "properties": {
+        "value": "[format('Server=tcp:{0}{1},1433;Initial Catalog={2};Persist Security Info=False;User ID={3};Password={4};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;', variables('names').resources.sql.serverName, environment().suffixes.sqlServerHostname, variables('names').resources.sql.databasename, variables('names').resources.sql.administratorName, variables('names').resources.sql.administratorPassword)]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('names').resources.keyVault)]",
+        "[resourceId('Microsoft.Sql/servers', variables('names').resources.sql.serverName)]",
+        "[resourceId('Microsoft.Sql/servers/databases', variables('names').resources.sql.serverName, variables('names').resources.sql.databasename)]"
+      ]
+    },
+    {
+      "type": "Microsoft.DataFactory/factories",
+      "apiVersion": "2018-06-01",
+      "name": "[variables('names').resources.dataFactory]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami))]": {}
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]"
+      ]
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "apiVersion": "2018-06-01",
+      "name": "[format('{0}/{1}', variables('names').resources.dataFactory, variables('names').dataFactory.linkedServices.keyVault)]",
+      "properties": {
+        "type": "AzureKeyVault",
+        "typeProperties": {
+          "baseUrl": "[reference(resourceId('Microsoft.KeyVault/vaults', variables('names').resources.keyVault), '2022-07-01').vaultUri]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('names').resources.keyVault)]"
+      ]
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "apiVersion": "2018-06-01",
+      "name": "[format('{0}/{1}', variables('names').resources.dataFactory, variables('names').dataFactory.linkedServices.blobStorage)]",
+      "properties": {
+        "type": "AzureBlobStorage",
+        "typeProperties": {
+          "connectionString": {
+            "type": "AzureKeyVaultSecret",
+            "store": {
+              "referenceName": "[variables('names').dataFactory.linkedServices.keyVault]",
+              "type": "LinkedServiceReference"
+            },
+            "secretName": "[variables('names').secrets.blobStorageConnectionString]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('names').resources.keyVault, variables('names').secrets.blobStorageConnectionString)]",
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', variables('names').resources.dataFactory, variables('names').dataFactory.linkedServices.keyVault)]"
+      ]
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "apiVersion": "2018-06-01",
+      "name": "[format('{0}/{1}', variables('names').resources.dataFactory, variables('names').dataFactory.linkedServices.sqlDatabase)]",
+      "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+          "connectionString": {
+            "type": "AzureKeyVaultSecret",
+            "store": {
+              "type": "LinkedServiceReference",
+              "referenceName": "[variables('names').dataFactory.linkedServices.keyVault]"
+            },
+            "secretName": "[variables('names').secrets.dataBaseConnectionString]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('names').resources.keyVault, variables('names').secrets.dataBaseConnectionString)]",
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', variables('names').resources.dataFactory, variables('names').dataFactory.linkedServices.keyVault)]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "container",
+        "count": "[length(range(0, length(variables('integrations'))))]"
+      },
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2022-05-01",
+      "name": "[format('{0}/{1}/{2}', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].suffix))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('names').resources.blobStorageAccount, 'default')]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "uamiIsBlobDataReader",
+        "count": "[length(range(0, length(variables('integrations'))))]"
+      },
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Storage/storageAccounts/{0}/blobServices/{1}/containers/{2}', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]",
+      "name": "[guid(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami), variables('names').roles.KeyVault.SecretsUser, resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix)))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('names').roles.StorageBlob.DataReader)]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]",
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "datasetStorage",
+        "count": "[length(range(0, length(variables('integrations'))))]"
+      },
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "[format('{0}/{1}', variables('names').resources.dataFactory, format('blob_{0}', variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].suffix))]",
+      "properties": {
+        "type": "DelimitedText",
+        "linkedServiceName": {
+          "referenceName": "[variables('names').dataFactory.linkedServices.blobStorage]",
+          "type": "LinkedServiceReference"
+        },
+        "parameters": {
+          "DirectoryNameFromPipelineToDataSet": {
+            "type": "string"
+          },
+          "FileNameFromPipelineToDataSet": {
+            "type": "string"
+          }
+        },
+        "typeProperties": {
+          "location": {
+            "type": "AzureBlobStorageLocation",
+            "container": {
+              "type": "Expression",
+              "value": "@dataset().DirectoryNameFromPipelineToDataSet"
+            },
+            "folderPath": null,
+            "fileName": {
+              "type": "Expression",
+              "value": "@dataset().FileNameFromPipelineToDataSet"
+            }
+          },
+          "columnDelimiter": ";",
+          "firstRowAsHeader": true,
+          "encodingName": "ISO-8859-1",
+          "quoteChar": "\""
+        },
+        "schema": "[variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].schema.csv]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', variables('names').resources.dataFactory, variables('names').dataFactory.linkedServices.blobStorage)]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "datasetDatabase",
+        "count": "[length(range(0, length(variables('integrations'))))]"
+      },
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "[format('{0}/{1}', variables('names').resources.dataFactory, format('sql_{0}', variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].suffix))]",
+      "properties": {
+        "type": "AzureSqlTable",
+        "linkedServiceName": {
+          "referenceName": "[variables('names').dataFactory.linkedServices.sqlDatabase]",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "schema": "dbo",
+          "table": "[toLower(variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].suffix)]"
+        },
+        "schema": "[variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].schema.db]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', variables('names').resources.dataFactory, variables('names').dataFactory.linkedServices.sqlDatabase)]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "pipeline",
+        "count": "[length(range(0, length(variables('integrations'))))]"
+      },
+      "type": "Microsoft.DataFactory/factories/pipelines",
+      "apiVersion": "2018-06-01",
+      "name": "[format('{0}/{1}', variables('names').resources.dataFactory, variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].suffix)]",
+      "properties": {
+        "parameters": {
+          "DirectoryNameFromTriggerToPipeline": {
+            "type": "string"
+          },
+          "FileNameFromTriggerToPipeline": {
+            "type": "string"
+          }
+        },
+        "activities": [
+          {
+            "type": "Copy",
+            "name": "[format('Copy {0} data', variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].suffix)]",
+            "description": "Pipeline copies CSV data from blob storage to SQL table",
+            "typeProperties": {
+              "source": {
+                "type": "DelimitedTextSource",
+                "storeSettings": {
+                  "type": "AzureBlobStorageReadSettings",
+                  "recursive": true,
+                  "enablePartitionDiscovery": false
+                },
+                "formatSettings": {
+                  "type": "DelimitedTextReadSettings"
+                }
+              },
+              "sink": {
+                "type": "AzureSqlSink",
+                "writeBehavior": "insert",
+                "sqlWriterUseTableLock": false,
+                "tableOption": "autoCreate",
+                "disableMetricsCollection": false
+              },
+              "enableStaging": false,
+              "translator": {
+                "type": "TabularTranslator",
+                "typeConversion": true,
+                "typeConversationSettings": {
+                  "allowDataTruncation": true,
+                  "treatBooleanAsNumber": false
+                }
+              }
+            },
+            "inputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "[format('blob_{0}', variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix)]",
+                "parameters": {
+                  "DirectoryNameFromPipelineToDataSet": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.DirectoryNameFromTriggerToPipeline"
+                  },
+                  "FileNameFromPipelineToDataSet": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.FileNameFromTriggerToPipeline"
+                  }
+                }
+              }
+            ],
+            "outputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "[format('sql_{0}', variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix)]"
+              }
+            ]
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', variables('names').resources.dataFactory, format('sql_{0}', variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', variables('names').resources.dataFactory, format('blob_{0}', variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "trigger",
+        "count": "[length(range(0, length(variables('integrations'))))]"
+      },
+      "type": "Microsoft.DataFactory/factories/triggers",
+      "apiVersion": "2018-06-01",
+      "name": "[format('{0}/{1}', variables('names').resources.dataFactory, variables('integrations')[range(0, length(variables('integrations')))[copyIndex()]].suffix)]",
+      "properties": {
+        "type": "BlobEventsTrigger",
+        "typeProperties": {
+          "events": [
+            "Microsoft.Storage.BlobCreated"
+          ],
+          "blobPathBeginsWith": "[format('/{0}/blobs/{1}', substring(toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix), add(lastIndexOf(toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix), '/'), 1), sub(sub(length(toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix)), lastIndexOf(toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix), '/')), 1)), variables('names').csvSettings.expectedPrefix)]",
+          "blobPathEndsWith": "[variables('names').csvSettings.expextedSuffix]",
+          "ignoreEmptyBlobs": false,
+          "scope": "[resourceId('Microsoft.Storage/storageAccounts', variables('names').resources.blobStorageAccount)]"
+        },
+        "pipelines": [
+          {
+            "pipelineReference": {
+              "type": "PipelineReference",
+              "referenceName": "[variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix]"
+            },
+            "parameters": {
+              "DirectoryNameFromTriggerToPipeline": "@triggerBody().folderPath",
+              "FileNameFromTriggerToPipeline": "@triggerBody().fileName"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]",
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]",
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]",
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('names').resources.blobStorageAccount, 'default', toLower(variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix))]",
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "[resourceId('Microsoft.DataFactory/factories/pipelines', variables('names').resources.dataFactory, variables('integrations')[range(0, length(variables('integrations')))[range(0, length(variables('integrations')))[copyIndex()]]].suffix)]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('names').resources.blobStorageAccount)]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deploymentScripts",
+      "apiVersion": "2020-10-01",
+      "name": "[variables('names').deploymentScript.name]",
+      "location": "[parameters('location')]",
+      "kind": "AzureCLI",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami))]": {}
+        }
+      },
+      "properties": {
+        "azCliVersion": "[variables('names').deploymentScript.azCliVersion]",
+        "timeout": "PT10M",
+        "retentionInterval": "P1D",
+        "cleanupPreference": "OnExpiration",
+        "containerSettings": {
+          "containerGroupName": "[uniqueString(resourceGroup().id, variables('names').deploymentScript.name)]"
+        },
+        "primaryScriptUri": "[uri(parameters('_artifactsLocation'), variables('names').deploymentScript.scriptName)]",
+        "environmentVariables": [
+          {
+            "name": "DATAFACTORY_ID",
+            "value": "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]"
+          },
+          {
+            "name": "TRIGGERS",
+            "value": "[join(map(variables('integrations'), lambda('i', lambdaVariables('i').suffix)), '|')]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]"
+      ]
+    }
+  ],
+  "outputs": {
+    "results": {
+      "type": "object",
+      "value": {
+        "containers": "[map(variables('integrations'), lambda('i', lambdaVariables('i').container))]",
+        "DATAFACTORY_ID": "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]"
+      }
+    }
+  }
+}

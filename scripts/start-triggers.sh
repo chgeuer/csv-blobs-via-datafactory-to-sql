@@ -19,11 +19,21 @@ for triggerName in "${triggerNames[@]}"
 do
   # https://learn.microsoft.com/en-us/rest/api/datafactory/triggers/start?tabs=HTTP
 
-  curl \
-    --include \
-    --request POST \
-    --url "${managementPortal}${DATAFACTORY_ID}/triggers/${triggerName}/start?api-version=2018-06-01" \
-    --header "Authorization: Bearer ${access_token}" \
-    --header "Content-Length: 0"
+  error="BadRequest"
+  while [ "${error}" == "BadRequest" ]
+  do
+    response="$( curl \
+      --silent \
+      --request POST \
+      --url "${managementPortal}${DATAFACTORY_ID}/triggers/${triggerName}/start?api-version=2018-06-01" \
+      --header "Authorization: Bearer ${access_token}" \
+      --header "Content-Length: 0" )"
 
+    error="$( echo "${response}" | jq -r '.error.code' )"
+
+    if [ "${error}" == "BadRequest" ]; then
+      echo "Problem starting the trigger: ${response}"
+      sleep 5
+    fi
+  done
 done

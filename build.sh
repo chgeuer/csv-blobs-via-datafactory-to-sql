@@ -1,12 +1,14 @@
 #!/bin/bash
 
-resourceGroupName="df2"
+resourceGroupName="df3"
 
 az bicep build \
   --file azuredeploy.bicep \
   --outfile azuredeploy.json
 
 git commit -am . && git push
+
+az group create --location northeurope --resource-group "${resourceGroupName}"
 
 az deployment group create \
   --resource-group "${resourceGroupName}" \

@@ -3,7 +3,7 @@
 resourceGroupName="df4"
 
 az bicep build --file azuredeploy.bicep --stdout \
-  | jq '(.resources[] | select(.type == "Microsoft.Resources/deploymentScripts")).dependsOn += ["triggers"]' \
+  | jq '(.resources[] | select(.type == "Microsoft.Resources/deploymentScripts")).dependsOn += ["trigger"]' \
   > azuredeploy.json
 
 git commit -am . && git push

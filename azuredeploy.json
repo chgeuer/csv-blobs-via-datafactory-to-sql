@@ -642,7 +642,7 @@
       "dependsOn": [
         "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
         "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]",
-        "triggers"
+        "trigger"
       ]
     }
   ],

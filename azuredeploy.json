@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.17.1.54307",
-      "templateHash": "17674016876792495713"
+      "templateHash": "5386706033935992887"
     }
   },
   "parameters": {
@@ -32,7 +32,6 @@
     },
     "sqlAdminPassword": {
       "type": "securestring",
-      "defaultValue": "SuperSecret123456.-",
       "metadata": {
         "description": "SQL Server - Admin password"
       }
@@ -73,6 +72,7 @@
   "variables": {
     "uniqueHostPrefix": "[format('k{0}', uniqueString(resourceGroup().id))]",
     "names": {
+      "triggerJoinChar": "|",
       "resources": {
         "keyVault": "[if(empty(parameters('keyVaultName')), variables('uniqueHostPrefix'), variables('uniqueHostPrefix'))]",
         "blobStorageAccount": "[if(empty(parameters('blobStorageAccountName')), variables('uniqueHostPrefix'), parameters('blobStorageAccountName'))]",
@@ -615,7 +615,11 @@
           },
           {
             "name": "TRIGGERS",
-            "value": "[join(map(variables('integrations'), lambda('i', lambdaVariables('i').suffix)), '|')]"
+            "value": "[join(map(variables('integrations'), lambda('i', lambdaVariables('i').suffix)), variables('names').triggerJoinChar)]"
+          },
+          {
+            "name": "TRIGGERJOINCHAR",
+            "value": "[variables('names').triggerJoinChar]"
           }
         ]
       },
@@ -629,7 +633,7 @@
     "results": {
       "type": "object",
       "value": {
-        "containers": "[map(variables('integrations'), lambda('i', lambdaVariables('i').container))]",
+        "containers": "[map(variables('integrations'), lambda('i', format('{0}/{1}', reference(resourceId('Microsoft.Storage/storageAccounts', variables('names').resources.blobStorageAccount), '2022-09-01').primaryEndpoints.blob, lambdaVariables('i').container)))]",
         "DATAFACTORY_ID": "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]"
       }
     }

@@ -17,11 +17,11 @@ echo "TRIGGERJOINCHAR: ${TRIGGERJOINCHAR}"
 echo "TRIGGERS: ${TRIGGERS}"
 echo "DATAFACTORY_ID: ${DATAFACTORY_ID}"
 
-resource="https://management.azure.com"
+managementPortal="https://management.azure.com"
 
 access_token="$(curl --silent --get --header "Metadata: true" \
     --data-urlencode "api-version=2018-02-01" \
-    --data-urlencode "resource=${resource}" \
+    --data-urlencode "resource=${managementPortal}" \
     --url "http://169.254.169.254/metadata/identity/oauth2/token" \
     | jq -r ".access_token")"
 
@@ -30,9 +30,12 @@ IFS="${TRIGGERJOINCHAR}" read -a triggerNames <<< "${TRIGGERS}"
 for triggerName in "${triggerNames[@]}"
 do
   # https://learn.microsoft.com/en-us/rest/api/datafactory/triggers/start?tabs=HTTP
+
   curl \
     --include \
     --request POST \
-    --url "${resource}${DATAFACTORY_ID}/triggers/${triggerName}/start?api-version=2018-06-01" \
-    --header "Authorization: Bearer ${access_token}"
+    --url "${managementPortal}${DATAFACTORY_ID}/triggers/${triggerName}/start?api-version=2018-06-01" \
+    --header "Authorization: Bearer ${access_token}" \
+    --header "Content-Length: 0"
+
 done

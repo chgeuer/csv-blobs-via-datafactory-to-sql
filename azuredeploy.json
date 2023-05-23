@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.17.1.54307",
-      "templateHash": "5386706033935992887"
+      "templateHash": "2610602744997483017"
     }
   },
   "parameters": {
@@ -106,6 +106,7 @@
         "expextedSuffix": ".csv"
       },
       "roles": {
+        "DataFactoryContributor": "673868aa-7521-48a0-acc6-0f60742d39f5",
         "KeyVault": {
           "CryptoOfficer": "14b46e9e-c2b7-41b4-b07b-48a6ebf60603",
           "SecretsUser": "4633458b-17de-408a-b874-0445c86b69e6"
@@ -295,6 +296,21 @@
         }
       },
       "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.DataFactory/factories/{0}', variables('names').resources.dataFactory)]",
+      "name": "[guid(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami), variables('names').roles.DataFactoryContributor, resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('names').roles.DataFactoryContributor)]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', variables('names').resources.dataFactory)]",
         "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('names').resources.uami)]"
       ]
     },
